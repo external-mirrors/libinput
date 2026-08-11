@@ -217,7 +217,7 @@ options = {
     # options with distinct values
     "enums": {
         "set-click-method": ["none", "clickfinger", "buttonareas"],
-        "set-scroll-method": ["none", "twofinger", "edge", "button"],
+        "set-scroll-method": ["none", "twofinger", "edge", "button", "circular"],
         "set-profile": ["adaptive", "flat", "custom"],
         "set-tap-map": ["lrm", "lmr"],
         "set-clickfinger-map": ["lrm", "lmr"],

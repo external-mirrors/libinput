@@ -154,6 +154,12 @@ enum tp_edge_scroll_touch_state {
 	EDGE_SCROLL_TOUCH_STATE_AREA,
 };
 
+enum tp_circular_scroll_touch_state {
+	CIRCULAR_SCROLL_TOUCH_STATE_NONE,
+	CIRCULAR_SCROLL_TOUCH_STATE_INNER, /* in the inner disc, pointer motion */
+	CIRCULAR_SCROLL_TOUCH_STATE_RING,  /* on the outer ring, scrolling */
+};
+
 enum tp_gesture_state {
 	GESTURE_STATE_NONE,
 	GESTURE_STATE_UNKNOWN,
@@ -264,6 +270,12 @@ struct tp_touch {
 		int direction;
 		struct libinput_timer timer;
 		struct device_coords initial;
+
+		/* Circular scroll state */
+		struct {
+			enum tp_circular_scroll_touch_state state;
+			double prev_angle; /* radians, from center */
+		} circular;
 	} scroll;
 
 	struct {
@@ -434,6 +446,14 @@ struct tp_dispatch {
 		struct {
 			usec_t h, v;
 		} duration;
+
+		struct {
+			struct device_coords center; /* device units */
+			int32_t ring_threshold_sq; /* squared distance, device units */
+			int32_t ring_reference_radius; /* device units */
+			int32_t dead_zone_radius_sq;   /* squared distance, device units
+							*/
+		} circular;
 	} scroll;
 
 	enum touchpad_event queued;
@@ -730,6 +750,27 @@ tp_edge_scroll_is_active(const struct tp_dispatch *tp);
 
 int
 tp_edge_scroll_touch_active(const struct tp_dispatch *tp, const struct tp_touch *t);
+
+void
+tp_circular_scroll_init(struct tp_dispatch *tp, struct evdev_device *device);
+
+void
+tp_remove_circular_scroll(struct tp_dispatch *tp);
+
+void
+tp_circular_scroll_handle_state(struct tp_dispatch *tp, usec_t time);
+
+int
+tp_circular_scroll_post_events(struct tp_dispatch *tp, usec_t time);
+
+void
+tp_circular_scroll_stop_events(struct tp_dispatch *tp, usec_t time);
+
+bool
+tp_circular_scroll_is_active(const struct tp_dispatch *tp);
+
+bool
+tp_circular_scroll_touch_active(const struct tp_dispatch *tp, const struct tp_touch *t);
 
 uint32_t
 tp_touch_get_edge(const struct tp_dispatch *tp, const struct tp_touch *t);

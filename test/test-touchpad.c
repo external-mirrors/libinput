@@ -1230,6 +1230,236 @@ START_TEST(touchpad_edge_scroll_into_area)
 }
 END_TEST
 
+START_TEST(touchpad_circular_scroll_method_default)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput_device *device = dev->libinput_device;
+	enum libinput_config_scroll_method method;
+
+	method = libinput_device_config_scroll_get_default_method(device);
+	litest_assert_enum_eq(method, LIBINPUT_CONFIG_SCROLL_CIRCULAR);
+
+	method = libinput_device_config_scroll_get_method(device);
+	litest_assert_enum_eq(method, LIBINPUT_CONFIG_SCROLL_CIRCULAR);
+}
+END_TEST
+
+START_TEST(touchpad_circular_scroll_method_exclusive)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput_device *device = dev->libinput_device;
+	uint32_t methods;
+
+	methods = libinput_device_config_scroll_get_methods(device);
+	litest_assert_int_eq(methods, (uint32_t)LIBINPUT_CONFIG_SCROLL_CIRCULAR);
+}
+END_TEST
+
+/* Sum the vertical scroll values across all SCROLL_FINGER events in
+ * the queue and return the total. Asserts that at least one such
+ * event was present, and that any legacy POINTER_AXIS events in the
+ * queue carry the FINGER axis source (getting that wrong would
+ * regress to wheel-style scroll behaviour in legacy clients). Used
+ * by the direction tests below — we don't use litest_assert_scroll()
+ * here because that helper enforces a specific zero/end-of-sequence
+ * pattern that doesn't match the frame-paced output of circular
+ * scroll. */
+static double
+touchpad_circular_scroll_sum_vertical(struct libinput *li)
+{
+	struct libinput_event *event;
+	double total = 0.0;
+	int nevents = 0;
+
+	libinput_dispatch(li);
+	while ((event = libinput_get_event(li)) != NULL) {
+		enum libinput_event_type type = libinput_event_get_type(event);
+		struct libinput_event_pointer *p =
+			libinput_event_get_pointer_event(event);
+
+		if (type == LIBINPUT_EVENT_POINTER_SCROLL_FINGER &&
+		    libinput_event_pointer_has_axis(
+			    p,
+			    LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL)) {
+			total += libinput_event_pointer_get_scroll_value(
+				p,
+				LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL);
+			nevents++;
+		} else if (type == LIBINPUT_EVENT_POINTER_AXIS) {
+			litest_assert_enum_eq(libinput_event_pointer_get_axis_source(p),
+					      LIBINPUT_POINTER_AXIS_SOURCE_FINGER);
+		}
+		libinput_event_destroy(event);
+	}
+
+	litest_assert_int_gt(nevents, 0);
+	return total;
+}
+
+enum circular_scroll_direction {
+	CIRCULAR_SCROLL_CW,
+	CIRCULAR_SCROLL_CCW,
+};
+
+START_TEST(touchpad_circular_scroll_direction)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput_device *device = dev->libinput_device;
+	struct libinput *li = dev->libinput;
+	enum circular_scroll_direction direction =
+		litest_test_param_get_i32(test_env->params, "direction");
+	bool natural = litest_test_param_get_bool(test_env->params, "natural");
+	double total;
+
+	litest_enable_circular_scroll(dev);
+	if (natural)
+		libinput_device_config_scroll_set_natural_scroll_enabled(device, 1);
+	litest_drain_events(li);
+
+	/* Quarter-circle on the ring. CW goes right edge → bottom edge
+	 * (angle increases in atan2 with y growing downward), which under
+	 * libinput's convention produces positive vertical scroll
+	 * ("scroll down"). CCW goes right → top, producing negative
+	 * ("scroll up"). Natural scroll flips the sign in either case. */
+	int end_y = (direction == CIRCULAR_SCROLL_CW) ? 90 : 10;
+	litest_touch_down(dev, 0, 90, 50);
+	litest_touch_move_to(dev, 0, 90, 50, 50, end_y, 10);
+	litest_touch_up(dev, 0);
+
+	total = touchpad_circular_scroll_sum_vertical(li);
+
+	bool expect_positive = (direction == CIRCULAR_SCROLL_CW) ^ natural;
+	if (expect_positive)
+		litest_assert_double_gt(total, 0.0);
+	else
+		litest_assert_double_lt(total, 0.0);
+}
+END_TEST
+
+START_TEST(touchpad_circular_scroll_inner_motion)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput *li = dev->libinput;
+
+	litest_enable_circular_scroll(dev);
+	litest_drain_events(li);
+
+	/* Drag horizontally well inside the inner disc. With ring
+	 * threshold at ~32% of pad radius, both endpoints sit ~10% from
+	 * centre — far from the ring and far from the dead zone. Intent
+	 * lock holds the touch in INNER mode for the whole drag, so we
+	 * expect pointer motion events and no scroll. */
+	litest_touch_down(dev, 0, 40, 50);
+	litest_touch_move_to(dev, 0, 40, 50, 60, 50, 10);
+	litest_touch_up(dev, 0);
+
+	litest_dispatch(li);
+	litest_assert_only_typed_events(li, LIBINPUT_EVENT_POINTER_MOTION);
+}
+END_TEST
+
+enum circular_scroll_start_zone {
+	CIRCULAR_SCROLL_START_INNER,
+	CIRCULAR_SCROLL_START_RING,
+};
+
+START_TEST(touchpad_circular_scroll_intent_lock)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput *li = dev->libinput;
+	enum circular_scroll_start_zone start =
+		litest_test_param_get_i32(test_env->params, "start");
+
+	litest_enable_circular_scroll(dev);
+	litest_drain_events(li);
+
+	/* Touch starts in one zone and drags toward the other. Intent
+	 * lock commits the touch to its starting zone's mode for the
+	 * whole gesture — so an inner-start stays motion-only even after
+	 * reaching the ring, and a ring-start stays scroll-only even after
+	 * reaching the inner disc (and, since the ring→inner drag here is
+	 * purely radial, produces no scroll events either — the queue is
+	 * simply empty of motion events). */
+	int start_x = (start == CIRCULAR_SCROLL_START_INNER) ? 40 : 90;
+	int end_x = (start == CIRCULAR_SCROLL_START_INNER) ? 90 : 60;
+	litest_touch_down(dev, 0, start_x, 50);
+	litest_touch_move_to(dev, 0, start_x, 50, end_x, 50, 10);
+	litest_touch_up(dev, 0);
+
+	litest_dispatch(li);
+	if (start == CIRCULAR_SCROLL_START_INNER)
+		litest_assert_only_typed_events(li, LIBINPUT_EVENT_POINTER_MOTION);
+	else
+		litest_assert_no_typed_events(li, LIBINPUT_EVENT_POINTER_MOTION);
+}
+END_TEST
+
+START_TEST(touchpad_circular_scroll_dead_zone)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput *li = dev->libinput;
+
+	litest_enable_circular_scroll(dev);
+	litest_drain_events(li);
+
+	/* Drag straight across the pad from right edge through dead
+	 * centre to left edge. The path is purely radial (no angular
+	 * change on either side of centre) so the gesture should not
+	 * produce any scroll output. Without the centre dead zone the
+	 * atan2 discontinuity at the origin would fabricate one huge
+	 * scroll event mid-gesture, of magnitude ~π × ring_reference_radius
+	 * device units — easily detectable by a non-empty queue. */
+	litest_touch_down(dev, 0, 90, 50);
+	litest_touch_move_to(dev, 0, 90, 50, 10, 50, 10);
+	litest_touch_up(dev, 0);
+
+	litest_dispatch(li);
+	litest_assert_empty_queue(li);
+}
+END_TEST
+
+START_TEST(touchpad_circular_scroll_method_change)
+{
+	struct litest_device *dev = litest_current_device();
+	struct libinput_device *device = dev->libinput_device;
+	struct libinput *li = dev->libinput;
+	enum libinput_config_status status;
+
+	litest_enable_circular_scroll(dev);
+	litest_drain_events(li);
+
+	/* Switch the method to NO_SCROLL. A ring gesture should no
+	 * longer produce scroll events; with circular scroll disabled
+	 * the ring touch falls back to ordinary pointer motion. */
+	status = libinput_device_config_scroll_set_method(
+		device,
+		LIBINPUT_CONFIG_SCROLL_NO_SCROLL);
+	litest_assert_enum_eq(status, LIBINPUT_CONFIG_STATUS_SUCCESS);
+
+	litest_touch_down(dev, 0, 90, 50);
+	litest_touch_move_to(dev, 0, 90, 50, 50, 90, 10);
+	litest_touch_up(dev, 0);
+
+	litest_dispatch(li);
+	litest_assert_no_typed_events(li, LIBINPUT_EVENT_POINTER_SCROLL_FINGER);
+	litest_drain_events(li);
+
+	/* Switch back to CIRCULAR. The same gesture must now produce
+	 * scroll events again. */
+	status = libinput_device_config_scroll_set_method(
+		device,
+		LIBINPUT_CONFIG_SCROLL_CIRCULAR);
+	litest_assert_enum_eq(status, LIBINPUT_CONFIG_STATUS_SUCCESS);
+
+	litest_touch_down(dev, 0, 90, 50);
+	litest_touch_move_to(dev, 0, 90, 50, 50, 90, 10);
+	litest_touch_up(dev, 0);
+
+	litest_dispatch(li);
+	litest_assert_only_axis_events(li, LIBINPUT_EVENT_POINTER_SCROLL_FINGER);
+}
+END_TEST
+
 static bool
 touchpad_has_top_palm_detect_size(struct litest_device *dev)
 {
@@ -7512,22 +7742,41 @@ TEST_COLLECTION(touchpad)
 	litest_add(touchpad_scroll_natural_defaults, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_scroll_natural_enable_config, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_scroll_natural_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
-	litest_add(touchpad_scroll_natural_edge, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
-	litest_add(touchpad_scroll_defaults, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_vert, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_horiz, LITEST_TOUCHPAD, LITEST_CLICKPAD);
+	litest_add(touchpad_scroll_natural_edge, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_scroll_defaults, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_vert, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_horiz, LITEST_TOUCHPAD, LITEST_CLICKPAD | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_edge_scroll_horiz_clickpad, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_edge_scroll_no_horiz, LITEST_TOUCHPAD, LITEST_CLICKPAD);
-	litest_add(touchpad_edge_scroll_no_motion, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_no_edge_after_motion, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_timeout, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_source, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_no_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
+	litest_add(touchpad_edge_scroll_no_motion, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_no_edge_after_motion, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_timeout, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_source, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_edge_scroll_no_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_edge_scroll_into_buttonareas, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_edge_scroll_within_buttonareas, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_edge_scroll_buttonareas_click_stops_scroll, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_edge_scroll_clickfinger_click_stops_scroll, LITEST_CLICKPAD, LITEST_ANY);
-	litest_add(touchpad_edge_scroll_into_area, LITEST_TOUCHPAD, LITEST_ANY);
+	litest_add(touchpad_edge_scroll_into_area, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
+
+	litest_add(touchpad_circular_scroll_method_default, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY);
+	litest_add(touchpad_circular_scroll_method_exclusive, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY);
+	litest_with_parameters(params,
+			       "direction", 'I', 2,
+			       litest_named_i32(CIRCULAR_SCROLL_CW, "cw"),
+			       litest_named_i32(CIRCULAR_SCROLL_CCW, "ccw"),
+			       "natural", 'b') {
+		litest_add_parametrized(touchpad_circular_scroll_direction, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY, params);
+	}
+	litest_add(touchpad_circular_scroll_inner_motion, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY);
+	litest_with_parameters(params,
+			       "start", 'I', 2,
+			       litest_named_i32(CIRCULAR_SCROLL_START_INNER, "inner"),
+			       litest_named_i32(CIRCULAR_SCROLL_START_RING, "ring")) {
+		litest_add_parametrized(touchpad_circular_scroll_intent_lock, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY, params);
+	}
+	litest_add(touchpad_circular_scroll_dead_zone, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY);
+	litest_add(touchpad_circular_scroll_method_change, LITEST_CIRCULAR_TOUCHPAD, LITEST_ANY);
 
 	litest_add(touchpad_left_handed, LITEST_TOUCHPAD|LITEST_BUTTON, LITEST_CLICKPAD);
 	litest_add_for_device(touchpad_left_handed_appletouch, LITEST_APPLETOUCH);
@@ -7537,7 +7786,7 @@ TEST_COLLECTION(touchpad)
 	litest_add(touchpad_left_handed_tapping_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
 	litest_add(touchpad_left_handed_delayed, LITEST_TOUCHPAD|LITEST_BUTTON, LITEST_CLICKPAD);
 	litest_add(touchpad_left_handed_clickpad_delayed, LITEST_CLICKPAD, LITEST_APPLE_CLICKPAD);
-	litest_add(touchpad_left_handed_rotation, LITEST_TOUCHPAD, LITEST_ANY);
+	litest_add(touchpad_left_handed_rotation, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
 
 	/* Semi-MT hover tests aren't generic, they only work on this device and
 	 * ignore the semi-mt capability (it doesn't matter for the tests) */
@@ -7571,11 +7820,11 @@ TEST_COLLECTION(touchpad)
 	litest_with_parameters(params, "fingers", 'i', 5, 1, 2, 3, 4, 5) {
 		litest_add_parametrized(touchpad_fingers_down_before_init, LITEST_TOUCHPAD, LITEST_ANY, params);
 	}
-	litest_add(touchpad_state_after_syn_dropped_2fg_change, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
+	litest_add(touchpad_state_after_syn_dropped_2fg_change, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD);
 
 	litest_add(touchpad_thumb_lower_area_movement, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_thumb_lower_area_movement_rethumb, LITEST_CLICKPAD, LITEST_ANY);
-	litest_add(touchpad_thumb_speed_empty_slots, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
+	litest_add(touchpad_thumb_speed_empty_slots, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_thumb_area_clickfinger, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_thumb_area_btnarea, LITEST_CLICKPAD, LITEST_ANY);
 	litest_add(touchpad_thumb_no_doublethumb, LITEST_CLICKPAD, LITEST_ANY);
@@ -7659,13 +7908,13 @@ TEST_COLLECTION(touchpad_dwt)
 	litest_add(touchpad_dwt_tap, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_dwt_tap_drag, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_dwt_click, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_dwt_edge_scroll, LITEST_TOUCHPAD, LITEST_CLICKPAD);
-	litest_add(touchpad_dwt_dont_interrupt_edge_scroll, LITEST_TOUCHPAD, LITEST_CLICKPAD);
+	litest_add(touchpad_dwt_edge_scroll, LITEST_TOUCHPAD, LITEST_CLICKPAD | LITEST_CIRCULAR_TOUCHPAD);
+	litest_add(touchpad_dwt_dont_interrupt_edge_scroll, LITEST_TOUCHPAD, LITEST_CLICKPAD | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_dwt_dont_interrupt_gesture_swipe, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
 	litest_add(touchpad_dwt_dont_interrupt_gesture_pinch, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
 	litest_add(touchpad_dwt_dont_interrupt_tap_drag, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_dwt_dont_interrupt_buttons, LITEST_TOUCHPAD, LITEST_ANY);
-	litest_add(touchpad_dwt_dont_interrupt_pointer_motion, LITEST_TOUCHPAD, LITEST_ANY);
+	litest_add(touchpad_dwt_dont_interrupt_pointer_motion, LITEST_TOUCHPAD, LITEST_ANY | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_dwt_pointer_motion_short_no_protect, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_dwt_config_default_timeout, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_dwt_config_default_on, LITEST_TOUCHPAD, LITEST_ANY);

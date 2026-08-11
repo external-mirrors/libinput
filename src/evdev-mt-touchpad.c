@@ -462,6 +462,7 @@ static void
 tp_stop_actions(struct tp_dispatch *tp, usec_t time)
 {
 	tp_edge_scroll_stop_events(tp, time);
+	tp_circular_scroll_stop_events(tp, time);
 	tp_gesture_cancel(tp, time);
 	tp_tap_suspend(tp, time);
 }
@@ -787,7 +788,8 @@ tp_touch_active(const struct tp_dispatch *tp, const struct tp_touch *t)
 	return (t->state == TOUCH_BEGIN || t->state == TOUCH_UPDATE) &&
 	       t->palm.state == PALM_NONE && !t->pinned.is_pinned &&
 	       !tp_thumb_ignored(tp, t) && tp_button_touch_active(tp, t) &&
-	       tp_edge_scroll_touch_active(tp, t);
+	       tp_edge_scroll_touch_active(tp, t) &&
+	       tp_circular_scroll_touch_active(tp, t);
 }
 
 bool
@@ -796,7 +798,8 @@ tp_touch_active_for_gesture(const struct tp_dispatch *tp, const struct tp_touch 
 	return (t->state == TOUCH_BEGIN || t->state == TOUCH_UPDATE) &&
 	       t->palm.state == PALM_NONE && !t->pinned.is_pinned &&
 	       !tp_thumb_ignored_for_gesture(tp, t) && tp_button_touch_active(tp, t) &&
-	       tp_edge_scroll_touch_active(tp, t);
+	       tp_edge_scroll_touch_active(tp, t) &&
+	       tp_circular_scroll_touch_active(tp, t);
 }
 
 static inline bool
@@ -1737,6 +1740,7 @@ tp_process_state(struct tp_dispatch *tp, usec_t time)
 
 	tp_button_handle_state(tp, time);
 	tp_edge_scroll_handle_state(tp, time);
+	tp_circular_scroll_handle_state(tp, time);
 
 	/*
 	 * We have a physical button down event on a clickpad. To avoid
@@ -1800,18 +1804,23 @@ tp_post_events(struct tp_dispatch *tp, usec_t time)
 
 	if (tp->palm.trackpoint_active || tp->dwt.keyboard_active) {
 		tp_edge_scroll_stop_events(tp, time);
+		tp_circular_scroll_stop_events(tp, time);
 		tp_gesture_cancel(tp, time);
 		return;
 	}
 
 	if (ignore_motion) {
 		tp_edge_scroll_stop_events(tp, time);
+		tp_circular_scroll_stop_events(tp, time);
 		tp_gesture_cancel_motion_gestures(tp, time);
 		tp_gesture_post_events(tp, time, true);
 		return;
 	}
 
 	if (tp_edge_scroll_post_events(tp, time) != 0)
+		return;
+
+	if (tp_circular_scroll_post_events(tp, time) != 0)
 		return;
 
 	tp_gesture_post_events(tp, time, false);
@@ -1976,6 +1985,7 @@ tp_interface_remove(struct evdev_dispatch *dispatch)
 	tp_remove_buttons(tp);
 	tp_remove_sendevents(tp);
 	tp_remove_edge_scroll(tp);
+	tp_remove_circular_scroll(tp);
 	tp_remove_gesture(tp);
 }
 
@@ -2320,7 +2330,8 @@ tp_keyboard_event(usec_t time, struct libinput_event *event, void *data)
 		 * can't possibly be an accidental touch.
 		 */
 		if (tp_gesture_is_active(tp) || tp_edge_scroll_is_active(tp) ||
-		    tp_tap_dragging(tp) || tp->buttons.state)
+		    tp_circular_scroll_is_active(tp) || tp_tap_dragging(tp) ||
+		    tp->buttons.state)
 			return;
 
 		/* don't trigger if the finger has been moving the pointer
@@ -3124,6 +3135,11 @@ tp_scroll_get_methods(struct tp_dispatch *tp)
 {
 	uint32_t methods = LIBINPUT_CONFIG_SCROLL_EDGE;
 
+	/* Round touchpads use circular scroll exclusively — edge and
+	 * two-finger scroll are both ill-suited to the geometry. */
+	if (evdev_device_has_model_quirk(tp->device, QUIRK_MODEL_CIRCULAR_TOUCHPAD))
+		return LIBINPUT_CONFIG_SCROLL_CIRCULAR;
+
 	/* Any movement with more than one finger has random cursor
 	 * jumps. Don't allow for 2fg scrolling on this device, see
 	 * fdo bug 91135 */
@@ -3158,6 +3174,7 @@ tp_scroll_config_scroll_method_set_method(struct libinput_device *device,
 		return LIBINPUT_CONFIG_STATUS_SUCCESS;
 
 	tp_edge_scroll_stop_events(tp, time);
+	tp_circular_scroll_stop_events(tp, time);
 	tp_gesture_stop_twofinger_scroll(tp, time);
 
 	tp->scroll.method = method;
@@ -3182,7 +3199,9 @@ tp_scroll_get_default_method(struct tp_dispatch *tp)
 
 	methods = tp_scroll_get_methods(tp);
 
-	if (methods & LIBINPUT_CONFIG_SCROLL_2FG)
+	if (methods & LIBINPUT_CONFIG_SCROLL_CIRCULAR)
+		method = LIBINPUT_CONFIG_SCROLL_CIRCULAR;
+	else if (methods & LIBINPUT_CONFIG_SCROLL_2FG)
 		method = LIBINPUT_CONFIG_SCROLL_2FG;
 	else
 		method = LIBINPUT_CONFIG_SCROLL_EDGE;
@@ -3217,6 +3236,7 @@ static void
 tp_init_scroll(struct tp_dispatch *tp, struct evdev_device *device)
 {
 	tp_edge_scroll_init(tp, device);
+	tp_circular_scroll_init(tp, device);
 
 	evdev_init_natural_scroll(device);
 	/* Override natural scroll config for Apple touchpads */

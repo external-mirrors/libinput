@@ -2268,17 +2268,17 @@ TEST_COLLECTION(gestures)
 		litest_add_parametrized(gestures_swipe_3fg_btntool, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
 		litest_add_parametrized(gestures_swipe_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
 		litest_add_parametrized(gestures_swipe_4fg_btntool, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_pinch, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_pinch_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_pinch_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_spread, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_pinch, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_pinch_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_pinch_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_spread, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 
 		litest_add_parametrized(gestures_hold_then_swipe_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
 		litest_add_parametrized(gestures_hold_then_swipe_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_hold_then_pinch_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_hold_then_pinch_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_hold_then_pinch_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_hold_then_spread, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_hold_then_pinch_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_hold_then_pinch_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_hold_then_pinch_4fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_hold_then_spread, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	litest_add(gestures_hold_then_3fg_buttonarea_scroll, LITEST_CLICKPAD, LITEST_SINGLE_TOUCH);
@@ -2294,33 +2294,33 @@ TEST_COLLECTION(gestures)
 	litest_with_parameters(params,
 			       "fingers", 'u', 2, 3, 4,
 			       "tap-enabled", 'b') {
-		litest_add_parametrized(gestures_3fg_drag, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_3fg_drag, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	litest_with_parameters(params,
 			       "fingers", 'u', 2, 3, 4,
 			       "tap-enabled", 'b',
 			       "wait", 'b') {
-		litest_add_parametrized(gestures_3fg_drag_lock_resume_3fg_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_3fg_drag_lock_resume_3fg_release_no_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_3fg_drag_lock_resume_3fg_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_3fg_drag_lock_resume_3fg_release_no_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	litest_with_parameters(params,
 			       "fingers", 'u', 2, 3, 4,
 			       "tap-enabled", 'b') {
-		litest_add_parametrized(gestures_3fg_drag_lock_resume_1fg_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_3fg_drag_lock_resume_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_3fg_drag_lock_resume_1fg_motion, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_3fg_drag_lock_resume_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	litest_with_parameters(params, "fingers", 'i', 2, 3, 4) {
-		litest_add_parametrized(gestures_3fg_drag_lock_resume_1fg_tap, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_3fg_drag_lock_resume_1fg_tap, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	litest_with_parameters(params,
 			       "fingers", 'u', 2, 3, 4,
 			       "tap-enabled", 'b') {
-		litest_add_parametrized(gestures_3fg_drag_fast_swipe, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(gestures_3fg_drag_slow_start, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(gestures_3fg_drag_fast_swipe, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(gestures_3fg_drag_slow_start, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 	}
 
 	/* Timing-sensitive test, valgrind is too slow */

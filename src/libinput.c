@@ -4794,6 +4794,7 @@ libinput_device_config_scroll_set_method(struct libinput_device *device,
 	case LIBINPUT_CONFIG_SCROLL_2FG:
 	case LIBINPUT_CONFIG_SCROLL_EDGE:
 	case LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN:
+	case LIBINPUT_CONFIG_SCROLL_CIRCULAR:
 		break;
 	default:
 		return LIBINPUT_CONFIG_STATUS_INVALID;

@@ -438,6 +438,7 @@ enum litest_device_type {
 	LITEST_ELANTECH_TOUCHPAD,
 	LITEST_GENERIC_PRESSUREPAD,
 	LITEST_MAGIC_TRACKPAD,
+	LITEST_PANASONIC_CF_SV1,
 	LITEST_SYNAPTICS_CLICKPAD_X220,
 	LITEST_SYNAPTICS_HOVER_SEMI_MT,
 	LITEST_SYNAPTICS_I2C,
@@ -585,6 +586,7 @@ enum litest_device_type {
 #define LITEST_FORCED_PROXOUT	bit(32)
 #define LITEST_PRECALIBRATED	bit(33)
 #define LITEST_DIAL		bit(34)
+#define LITEST_CIRCULAR_TOUCHPAD	bit(35)
 
 /* this is a semi-mt device, so we keep track of the touches that the tests
  * send and modify them so that the first touch is always slot 0 and sends
@@ -1562,6 +1564,22 @@ litest_enable_edge_scroll(struct litest_device *dev)
 
 	status = libinput_device_config_scroll_set_method(device,
 							  LIBINPUT_CONFIG_SCROLL_EDGE);
+
+	expected = LIBINPUT_CONFIG_STATUS_SUCCESS;
+	litest_assert_int_eq(status, expected);
+
+	libinput_device_config_scroll_set_natural_scroll_enabled(device, 0);
+}
+
+static inline void
+litest_enable_circular_scroll(struct litest_device *dev)
+{
+	enum libinput_config_status status, expected;
+	struct libinput_device *device = dev->libinput_device;
+
+	status = libinput_device_config_scroll_set_method(
+		device,
+		LIBINPUT_CONFIG_SCROLL_CIRCULAR);
 
 	expected = LIBINPUT_CONFIG_STATUS_SUCCESS;
 	litest_assert_int_eq(status, expected);

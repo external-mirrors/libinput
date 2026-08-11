@@ -1206,9 +1206,10 @@ tp_notify_clickpadbutton(struct tp_dispatch *tp,
 			return 0;
 	}
 
-	/* A button click always terminates edge scrolling, even if we
-	 * don't end up sending a button event. */
+	/* A button click always terminates edge or circular scrolling,
+	 * even if we don't end up sending a button event. */
 	tp_edge_scroll_stop_events(tp, time);
+	tp_circular_scroll_stop_events(tp, time);
 
 	/*
 	 * If the user has requested clickfinger replace the button chosen

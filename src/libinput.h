@@ -6435,6 +6435,13 @@ enum libinput_config_scroll_method {
 	 * along a scroll-capable axis.
 	 */
 	LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN = (1 << 2),
+	/**
+	 * Send scroll events when a finger moves in a circular motion,
+	 * clockwise for a logical scroll down and counterclockwise for
+	 * a logical scroll up.
+	 * @since 1.32
+	 */
+	LIBINPUT_CONFIG_SCROLL_CIRCULAR = (1 << 3),
 };
 
 /**

@@ -170,14 +170,17 @@ scroll_defaults(struct libinput_device *device)
 	method = libinput_device_config_scroll_get_default_method(device);
 
 	xasprintf(&str,
-		  "%s%s%s%s%s%s",
+		  "%s%s%s%s%s%s%s%s",
 		  (method == LIBINPUT_CONFIG_SCROLL_2FG) ? "*" : "",
 		  (scroll_methods & LIBINPUT_CONFIG_SCROLL_2FG) ? "two-finger " : "",
 		  (method == LIBINPUT_CONFIG_SCROLL_EDGE) ? "*" : "",
 		  (scroll_methods & LIBINPUT_CONFIG_SCROLL_EDGE) ? "edge " : "",
 		  (method == LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN) ? "*" : "",
-		  (scroll_methods & LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN) ? "button"
-									   : "");
+		  (scroll_methods & LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN) ? "button "
+									   : "",
+		  (method == LIBINPUT_CONFIG_SCROLL_CIRCULAR) ? "*" : "",
+		  (scroll_methods & LIBINPUT_CONFIG_SCROLL_CIRCULAR) ? "circular "
+								     : "");
 	return str;
 }
 

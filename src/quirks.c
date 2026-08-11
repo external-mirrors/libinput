@@ -256,6 +256,8 @@ quirk_get_name(enum quirk q)
 		return "ModelBouncingKeys";
 	case QUIRK_MODEL_CHROMEBOOK:
 		return "ModelChromebook";
+	case QUIRK_MODEL_CIRCULAR_TOUCHPAD:
+		return "ModelCircularTouchpad";
 	case QUIRK_MODEL_CLEVO_W740SU:
 		return "ModelClevoW740SU";
 	case QUIRK_MODEL_DELL_CANVAS_TOTEM:

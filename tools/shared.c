@@ -274,6 +274,8 @@ tools_parse_option(int option, const char *optarg, struct tools_options *options
 			options->scroll_method = LIBINPUT_CONFIG_SCROLL_EDGE;
 		} else if (streq(optarg, "button")) {
 			options->scroll_method = LIBINPUT_CONFIG_SCROLL_ON_BUTTON_DOWN;
+		} else if (streq(optarg, "circular")) {
+			options->scroll_method = LIBINPUT_CONFIG_SCROLL_CIRCULAR;
 		} else {
 			return 1;
 		}

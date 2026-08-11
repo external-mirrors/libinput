@@ -5594,7 +5594,7 @@ TEST_COLLECTION(touchpad_tap)
 	litest_add(touchpad_3fg_tap_hover_btntool, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
 	litest_add(touchpad_3fg_tap_pressure_btntool, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
 	litest_add_for_device(touchpad_3fg_tap_slot_release_btntool, LITEST_SYNAPTICS_TOPBUTTONPAD);
-	litest_add(touchpad_3fg_tap_after_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH);
+	litest_add(touchpad_3fg_tap_after_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD);
 
 	litest_add(touchpad_4fg_tap, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH|LITEST_SEMI_MT);
 	litest_add(touchpad_4fg_tap_quickrelease, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH|LITEST_SEMI_MT);
@@ -5622,7 +5622,7 @@ TEST_COLLECTION(touchpad_tap)
 	}
 
 	litest_add(touchpad_tap_default_disabled, LITEST_TOUCHPAD|LITEST_BUTTON, LITEST_ANY);
-	litest_add(touchpad_tap_default_enabled, LITEST_TOUCHPAD, LITEST_BUTTON);
+	litest_add(touchpad_tap_default_enabled, LITEST_TOUCHPAD, LITEST_BUTTON | LITEST_CIRCULAR_TOUCHPAD);
 	litest_add(touchpad_tap_invalid, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_tap_is_available, LITEST_TOUCHPAD, LITEST_ANY);
 	litest_add(touchpad_tap_is_not_available, LITEST_ANY, LITEST_TOUCHPAD);
@@ -5669,8 +5669,8 @@ TEST_COLLECTION(touchpad_tap_drag)
 
 		litest_add_parametrized(touchpad_tap_n_drag, LITEST_TOUCHPAD, LITEST_ANY, params);
 		litest_add_parametrized(touchpad_tap_n_drag_2fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(touchpad_tap_n_drag_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
-		litest_add_parametrized(touchpad_tap_n_drag_draglock_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
+		litest_add_parametrized(touchpad_tap_n_drag_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
+		litest_add_parametrized(touchpad_tap_n_drag_draglock_2fg_scroll, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH | LITEST_CIRCULAR_TOUCHPAD, params);
 		litest_add_parametrized(touchpad_tap_n_drag_3fg_btntool, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH|LITEST_APPLE_CLICKPAD, params);
 		litest_add_parametrized(touchpad_tap_n_drag_3fg, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
 		litest_add_parametrized(touchpad_tap_n_drag_3fg_swipe, LITEST_TOUCHPAD, LITEST_SINGLE_TOUCH, params);
