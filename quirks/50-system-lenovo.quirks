@@ -515,3 +515,14 @@ MatchBus=usb
 MatchVendor=0x258A
 MatchProduct=0x1015
 AttrKeyboardIntegration=internal
+
+# Found in:
+#   Lenovo ThinkPad X1 Tablet Gen 3 (20KJ)
+# Known names:
+#   "Chicony ThinkPad X1 Tablet Thin Keyboard Gen 3"
+[Lenovo ThinkPad X1 Tablet Gen 3 Thin Keyboard]
+MatchUdevType=keyboard
+MatchBus=usb
+MatchVendor=0x17EF
+MatchProduct=0x60B5
+AttrKeyboardIntegration=internal
